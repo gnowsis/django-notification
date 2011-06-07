@@ -9,6 +9,7 @@ from django.db import models
 from django.db.models.query import QuerySet
 from django.conf import settings
 from django.core.mail import send_mail
+from django.core.mail import send_mass_mail
 from django.core.urlresolvers import reverse
 from django.template import Context
 from django.template.loader import render_to_string
@@ -119,14 +120,14 @@ class NoticeManager(models.Manager):
         mark them seen
         """
         return self.notices_for(recipient, unseen=True, **kwargs).count()
-    
+
     def received(self, recipient, **kwargs):
         """
         returns notices the given recipient has recieved.
         """
         kwargs["sent"] = False
         return self.notices_for(recipient, **kwargs)
-    
+
     def sent(self, sender, **kwargs):
         """
         returns notices the given sender has sent
@@ -254,7 +255,7 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
         'spam': 'eggs',
         'foo': 'bar',
     )
-    
+
     You can pass in on_site=False to prevent the notice emitted from being
     displayed on the site.
     """
@@ -281,6 +282,7 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
         'full.html',
     ) # TODO make formats configurable
 
+    notices=[]
     for user in users:
         recipients = []
         # get user language for user from language store defined in
@@ -318,12 +320,67 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
 
         notice = Notice.objects.create(recipient=user, message=messages['notice.html'],
             notice_type=notice_type, on_site=on_site, sender=sender)
+        notices.append(notice)
         if should_send(user, notice_type, "1") and user.email and user.is_active: # Email
             recipients.append(user.email)
         send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients)
 
     # reset environment to original language
     activate(current_language)
+    return notices
+
+def send_notices(notices, from_email=settings.DEFAULT_FROM_EMAIL, extra_context={}):
+    """
+    Does not create a new notice, just send existing notice.
+
+    This is intended to be how other apps create new notices.
+
+    notification.send([notices], {
+        'spam': 'eggs',
+        'foo': 'bar',
+    })
+    """
+
+    current_site = Site.objects.get_current()
+
+    formats = (
+        'short.txt',
+        'full.txt',
+    )
+
+    emails = []
+    for notice in notices:
+        user = notice.user
+        # update context with user specific translations
+        context = Context({
+            "user": user,
+            "notice": ugettext(notice.notice_type.display),
+            "current_site": current_site,
+            "message":notice.message,
+        })
+        context.update(extra_context)
+
+        # get prerendered format messages
+        messages = get_formatted_messages(formats, notice.notice_type.label, context)
+
+        # Strip newlines from subject
+        subject = ''.join(render_to_string('notification/email_subject.txt', {
+            'message': messages['short.txt'],
+        }, context).splitlines())
+
+        body = render_to_string('notification/email_body.txt', {
+            'message': messages['full.txt'],
+        }, context)
+
+        notice_type= notice.notice_type
+        recipients = None
+        if should_send(user, notice_type, "1") and user.email: # Email
+            recipients = (user.email,)
+        emails.append((subject, body, from_email, recipients,))
+
+    send_mass_mail([(a,b,c,d,) for (a,b,c,d ) in emails if a and b and c and d] )
+
+
 
 def send(*args, **kwargs):
     """
@@ -344,7 +401,7 @@ def send(*args, **kwargs):
             return queue(*args, **kwargs)
         else:
             return send_now(*args, **kwargs)
-        
+
 def queue(users, label, extra_context=None, on_site=True, sender=None):
     """
     Queue the notification in NoticeQueueBatch. This allows for large amounts
