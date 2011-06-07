@@ -353,7 +353,7 @@ def send_notices(notices, from_email=settings.DEFAULT_FROM_EMAIL, extra_context=
         user = notice.user
         # update context with user specific translations
         context = Context({
-            "user": user,
+            "recipient": user,
             "notice": ugettext(notice.notice_type.display),
             "current_site": current_site,
             "message":notice.message,
