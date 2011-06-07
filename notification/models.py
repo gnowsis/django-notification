@@ -350,7 +350,7 @@ def send_notices(notices, from_email=settings.DEFAULT_FROM_EMAIL, extra_context=
 
     emails = []
     for notice in notices:
-        user = notice.user
+        user = notice.recipient
         # update context with user specific translations
         context = Context({
             "recipient": user,
