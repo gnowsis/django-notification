@@ -27,6 +27,11 @@ from django.utils.translation import ugettext_lazy as _
 from django.utils.translation import ugettext, get_language, activate
 
 
+if 'mailer' in settings.INSTALLED_APPS:
+    from mailer import send_html_mail
+else:
+    send_html_mail = False
+
 QUEUE_ALL = getattr(settings, "NOTIFICATION_QUEUE_ALL", False)
 
 class LanguageStoreNotAvailable(Exception):
@@ -140,6 +145,7 @@ class Notice(models.Model):
     recipient = models.ForeignKey(User, related_name='recieved_notices', verbose_name=_('recipient'))
     sender = models.ForeignKey(User, null=True, related_name='sent_notices', verbose_name=_('sender'))
     message = models.TextField(_('message'))
+    message_header = models.TextField(_('message header'), default='')
     notice_type = models.ForeignKey(NoticeType, verbose_name=_('notice type'))
     added = models.DateTimeField(_('added'), default=datetime.datetime.now)
     unseen = models.BooleanField(_('unseen'), default=True)
@@ -277,8 +283,8 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
 
     formats = (
         'short.txt',
+        'short.html',
         'full.txt',
-        'notice.html',
         'full.html',
     ) # TODO make formats configurable
 
@@ -296,8 +302,12 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
             # activate the user's language
             activate(language)
 
+        #if html title is not present use title
+        if extra_context.get("title", False):
+            extra_context['title_html'] = extra_context.get('title','')
         # update context with user specific translations
         context = Context({
+            'MEDIA_URL':settings.MEDIA_URL,
             "recipient": user,
             "sender": sender,
             "notice": ugettext(notice_type.display),
@@ -318,13 +328,22 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
             'message': messages['full.txt'],
         }, context)
 
-        notice = Notice.objects.create(recipient=user, message=messages['notice.html'],
+        email_body = render_to_string('notification/email_body.html', {
+            'message': messages['full.html'],
+        }, context)
+
+        notice = Notice.objects.create(recipient=user, message=messages['full.html'],
+                                       message_header=messages['short.html'],
             notice_type=notice_type, on_site=on_site, sender=sender)
         notices.append(notice)
         if should_send(user, notice_type, "1") and user.email and user.is_active: # Email
             recipients.append(user.email)
-        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients)
 
+        if send_html_mail and email_body:
+            send_html_mail(subject, body, email_body,
+                           settings.DEFAULT_FROM_EMAIL, recipients)
+        else:
+            send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients)
     # reset environment to original language
     activate(current_language)
     return notices

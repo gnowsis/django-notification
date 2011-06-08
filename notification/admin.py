@@ -8,12 +8,12 @@ class NoticeSettingAdmin(admin.ModelAdmin):
     list_display = ('id', 'user', 'notice_type', 'medium', 'send')
 
 class NoticeAdmin(admin.ModelAdmin):
-    list_display = ('message', 'recipient', 'sender','notice_type', 'added', 'unseen', 'archived', 'on_site')
+    list_display = ('id','message_header','message', 'recipient', 'sender','notice_type', 'added', 'unseen', 'archived', 'on_site')
     list_editable = ('on_site',)
 
     fieldsets = (
         (None, {
-            'fields': ('message',  'recipient','notice_type')
+            'fields': ('message_header','message',  'recipient','notice_type')
         }),
         ('Advanced options',{
             'classes': ('collapse',),
