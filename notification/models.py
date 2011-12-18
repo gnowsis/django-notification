@@ -26,6 +26,8 @@ from django.contrib.contenttypes import generic
 from django.utils.translation import ugettext_lazy as _
 from django.utils.translation import ugettext, get_language, activate
 
+from settings import EMAIL_SUBJECT_TEMPLATE, EMAIL_BODY_PLAIN_TEMPLATE, EMAIL_BODY_HTML_TEMPLATE, TEMPLATE_ROOT
+
 
 if 'mailer' in settings.INSTALLED_APPS:
     from mailer import send_html_mail
@@ -247,8 +249,8 @@ def get_formatted_messages(formats, label, context):
         else:
             context.autoescape = True
         format_templates[format] = render_to_string((
-            'notification/%s/%s' % (label, format),
-            'notification/%s' % format), context_instance=context)
+            '%s%s/%s' % (TEMPLATE_ROOT, label, format),
+            '%s%s' % (TEMPLATE_ROOT, format)), context_instance=context)
     return format_templates
 
 def send_now(users, label, extra_context=None, on_site=True, sender=None):
@@ -320,15 +322,15 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
         messages = get_formatted_messages(formats, label, context)
 
         # Strip newlines from subject
-        subject = ''.join(render_to_string('notification/email_subject.txt', {
+        subject = ''.join(render_to_string(EMAIL_SUBJECT_TEMPLATE, {
             'message': messages['short.txt'],
         }, context).splitlines())
 
-        body = render_to_string('notification/email_body.txt', {
+        body = render_to_string(EMAIL_BODY_PLAIN_TEMPLATE, {
             'message': messages['full.txt'],
         }, context)
 
-        email_body = render_to_string('notification/email_body.html', {
+        email_body = render_to_string(EMAIL_BODY_HTML_TEMPLATE, {
             'message': messages['full.html'],
         }, context)
 
@@ -383,11 +385,11 @@ def send_notices(notices, from_email=settings.DEFAULT_FROM_EMAIL, extra_context=
         messages = get_formatted_messages(formats, notice.notice_type.label, context)
 
         # Strip newlines from subject
-        subject = ''.join(render_to_string('notification/email_subject.txt', {
+        subject = ''.join(render_to_string(EMAIL_SUBJECT_TEMPLATE, {
             'message': messages['short.txt'],
         }, context).splitlines())
 
-        body = render_to_string('notification/email_body.txt', {
+        body = render_to_string(EMAIL_BODY_PLAIN_TEMPLATE, {
             'message': messages['full.txt'],
         }, context)
 
