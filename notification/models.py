@@ -10,6 +10,7 @@ from django.db.models.query import QuerySet
 from django.conf import settings
 from django.core.mail import send_mail
 from django.core.mail import send_mass_mail
+from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.core.urlresolvers import reverse
 from django.template import Context
 from django.template.loader import render_to_string
@@ -253,7 +254,7 @@ def get_formatted_messages(formats, label, context):
             '%s%s' % (TEMPLATE_ROOT, format)), context_instance=context)
     return format_templates
 
-def send_now(users, label, extra_context=None, on_site=True, sender=None):
+def send_now(users, label, extra_context=None, on_site=True, sender=None, reply_to=None):
     """
     Creates a new notice.
 
@@ -341,11 +342,19 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
         if should_send(user, notice_type, "1") and user.email and user.is_active: # Email
             recipients.append(user.email)
 
+        _email_headers = {}
+        if reply_to:
+            _email_headers['Reply-To'] = unicode(reply_to)
+
         if send_html_mail and email_body:
-            send_html_mail(subject, body, email_body,
-                           settings.DEFAULT_FROM_EMAIL, recipients)
+            _email_message = EmailMultiAlternatives(subject, body, settings.DEFAULT_FROM_EMAIL, recipients, headers=_email_headers)
+            _email_message.attach_alternative(email_body, 'text/html')
         else:
-            send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients)
+            _email_message = EmailMessage(subject, body, settings.DEFAULT_FROM_EMAIL, recipients, headers=_email_headers)
+
+        _email_message.send()
+
+
     # reset environment to original language
     activate(current_language)
     return notices
