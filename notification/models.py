@@ -254,7 +254,7 @@ def get_formatted_messages(formats, label, context):
             '%s%s' % (TEMPLATE_ROOT, format)), context_instance=context)
     return format_templates
 
-def send_now(users, label, extra_context=None, on_site=True, sender=None, reply_to=None):
+def send_now(users, label, extra_context=None, on_site=True, sender=None, from_email=None, reply_to=None):
     """
     Creates a new notice.
 
@@ -270,6 +270,8 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None, reply_
     """
     if extra_context is None:
         extra_context = {}
+
+    from_email = from_email or settings.DEFAULT_FROM_EMAIL
 
     notice_type = NoticeType.objects.get(label=label)
 
@@ -347,10 +349,10 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None, reply_
             _email_headers['Reply-To'] = unicode(reply_to)
 
         if send_html_mail and email_body:
-            _email_message = EmailMultiAlternatives(subject, body, settings.DEFAULT_FROM_EMAIL, recipients, headers=_email_headers)
+            _email_message = EmailMultiAlternatives(subject, body, from_email, recipients, headers=_email_headers)
             _email_message.attach_alternative(email_body, 'text/html')
         else:
-            _email_message = EmailMessage(subject, body, settings.DEFAULT_FROM_EMAIL, recipients, headers=_email_headers)
+            _email_message = EmailMessage(subject, body, from_email, recipients, headers=_email_headers)
 
         _email_message.send()
 
