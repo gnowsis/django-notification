@@ -1,5 +1,3 @@
-import datetime
-
 try:
     import cPickle as pickle
 except ImportError:
@@ -17,6 +15,7 @@ from django.template import Context
 from django.template.loader import render_to_string
 from django.utils.translation import ugettext_lazy as _
 from django.utils.translation import ugettext, get_language, activate
+from django.utils import timezone
 
 from django.contrib.sites.models import Site
 from django.contrib.auth.models import User
@@ -153,7 +152,7 @@ class Notice(models.Model):
     message = models.TextField(_('message'))
     message_header = models.TextField(_('message header'), default='')
     notice_type = models.ForeignKey(NoticeType, verbose_name=_('notice type'))
-    added = models.DateTimeField(_('added'), default=datetime.datetime.now)
+    added = models.DateTimeField(_('added'), default=timezone.now)
     unseen = models.BooleanField(_('unseen'), default=True)
     archived = models.BooleanField(_('archived'), default=False)
     on_site = models.BooleanField(_('on site'))
@@ -488,7 +487,7 @@ class ObservedItem(models.Model):
     
     notice_type = models.ForeignKey(NoticeType, verbose_name=_("notice type"))
     
-    added = models.DateTimeField(_("added"), default=datetime.datetime.now)
+    added = models.DateTimeField(_("added"), default=timezone.now)
     
     # the signal that will be listened to send the notice
     signal = models.TextField(verbose_name=_("signal"))
