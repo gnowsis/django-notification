@@ -26,7 +26,13 @@ from django.contrib.contenttypes import generic
 from django.utils.translation import ugettext_lazy as _
 from django.utils.translation import ugettext, get_language, activate
 
-from settings import EMAIL_SUBJECT_TEMPLATE, EMAIL_BODY_PLAIN_TEMPLATE, EMAIL_BODY_HTML_TEMPLATE, TEMPLATE_ROOT
+try:
+    from celery.task import Task
+except:
+    Task = object # huh, does this work?
+
+
+from settings import EMAIL_SUBJECT_TEMPLATE, EMAIL_BODY_PLAIN_TEMPLATE, EMAIL_BODY_HTML_TEMPLATE, TEMPLATE_ROOT, USE_CELERY
 
 
 if 'mailer' in settings.INSTALLED_APPS:
@@ -259,7 +265,18 @@ def get_formatted_messages(formats, label, context):
             '%s%s' % (TEMPLATE_ROOT, format)), context_instance=context)
     return format_templates
 
-def send_now(users, label, extra_context=None, on_site=True, sender=None, from_email=None, reply_to=None):
+
+# simple wrapper task around send_now
+class SendNowTask(Task):
+    def run(self, users, label, extra_context=None, on_site=True, sender=None, from_email=None, reply_to=None):
+        try:
+            send_now(users, label, extra_context=extra_context, on_site=on_site, sender=sender, from_email=from_email, reply_to=reply_to, _force_now=True)
+        except Exception, e:
+            #print "SendNowTask exception: %s" % e
+            self.retry(args=[users, label], kwargs={'extra_context': extra_context, 'on_site': on_site, 'sender': sender, 'from_email': from_email, 'reply_to': reply_to}, exc=e)
+
+
+def send_now(users, label, extra_context=None, on_site=True, sender=None, from_email=None, reply_to=None, _force_now=False):
     """
     Creates a new notice.
     
@@ -273,6 +290,11 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None, from_e
     You can pass in on_site=False to prevent the notice emitted from being
     displayed on the site.
     """
+
+    if USE_CELERY and not _force_now:
+        SendNowTask.delay(users, label, extra_context=extra_context, on_site=on_site, sender=sender, from_email=from_email, reply_to=reply_to)
+        return
+
     if extra_context is None:
         extra_context = {}
 
