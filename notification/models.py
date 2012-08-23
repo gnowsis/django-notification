@@ -268,15 +268,15 @@ def get_formatted_messages(formats, label, context):
 
 # simple wrapper task around send_now
 class SendNowTask(Task):
-    def run(self, users, label, extra_context=None, on_site=True, sender=None, from_email=None, reply_to=None):
+    def run(self, users, label, extra_context=None, on_site=True, sender=None, from_email=None, reply_to=None, send_if_inactive=False):
         try:
-            send_now(users, label, extra_context=extra_context, on_site=on_site, sender=sender, from_email=from_email, reply_to=reply_to, _force_now=True)
+            send_now(users, label, extra_context=extra_context, on_site=on_site, sender=sender, from_email=from_email, reply_to=reply_to, send_if_inactive=send_if_inactive, _force_now=True)
         except Exception, e:
             #print "SendNowTask exception: %s" % e
-            self.retry(args=[users, label], kwargs={'extra_context': extra_context, 'on_site': on_site, 'sender': sender, 'from_email': from_email, 'reply_to': reply_to}, exc=e)
+            self.retry(args=[users, label], kwargs={'extra_context': extra_context, 'on_site': on_site, 'sender': sender, 'from_email': from_email, 'reply_to': reply_to, 'send_if_inactive': send_if_inactive}, exc=e)
 
 
-def send_now(users, label, extra_context=None, on_site=True, sender=None, from_email=None, reply_to=None, _force_now=False):
+def send_now(users, label, extra_context=None, on_site=True, sender=None, from_email=None, reply_to=None, send_if_inactive=False, _force_now=False):
     """
     Creates a new notice.
     
@@ -292,7 +292,7 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None, from_e
     """
 
     if USE_CELERY and not _force_now:
-        SendNowTask.delay(users, label, extra_context=extra_context, on_site=on_site, sender=sender, from_email=from_email, reply_to=reply_to)
+        SendNowTask.delay(users, label, extra_context=extra_context, on_site=on_site, sender=sender, from_email=from_email, reply_to=reply_to, send_if_inactive=send_if_inactive)
         return
 
     if extra_context is None:
@@ -370,7 +370,7 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None, from_e
                                        message_header=messages['short.html'],
             notice_type=notice_type, on_site=on_site, sender=sender)
         notices.append(notice)
-        if should_send(user, notice_type, "1") and user.email and user.is_active: # Email
+        if should_send(user, notice_type, "1") and user.email and (send_if_inactive or user.is_active): # Email
             recipients.append(user.email)
 
         _email_headers = {}
