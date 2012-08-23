@@ -254,7 +254,7 @@ def get_formatted_messages(formats, label, context):
             '%s%s' % (TEMPLATE_ROOT, format)), context_instance=context)
     return format_templates
 
-def send_now(users, label, extra_context=None, on_site=True, sender=None, from_email=None, reply_to=None):
+def send_now(users, label, extra_context=None, on_site=True, sender=None, from_email=None, reply_to=None, send_if_inactive=False):
     """
     Creates a new notice.
 
@@ -341,7 +341,7 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None, from_e
                                        message_header=messages['short.html'],
             notice_type=notice_type, on_site=on_site, sender=sender)
         notices.append(notice)
-        if should_send(user, notice_type, "1") and user.email and user.is_active: # Email
+        if should_send(user, notice_type, "1") and user.email and (send_if_inactive or user.is_active): # Email
             recipients.append(user.email)
 
         _email_headers = {}
